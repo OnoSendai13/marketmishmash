@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import PriceChart from './PriceChart'
 import TimeframeSelector from './TimeframeSelector'
-import { fetchStockCandles } from '../services/finnhub'
+import { fetchStockChartYahoo } from '../services/yahoo'
 import { DEFAULT_TIMEFRAME, getTimeframe } from '../config/timeframes'
 import { formatPercent, formatPrice } from '../utils/format'
 
@@ -22,14 +22,17 @@ export default function StockCard({ quote, currency = 'usd' }) {
       setChartError(null)
       try {
         const tf = getTimeframe(timeframe)
-        const to = Math.floor(Date.now() / 1000)
-        const from = to - tf.seconds
-        const points = await fetchStockCandles(quote.symbol, tf.resolution, from, to)
+        // Historique fourni par Yahoo Finance (le prix temps réel vient de Finnhub).
+        const points = await fetchStockChartYahoo(
+          quote.symbol,
+          tf.yahooRange,
+          tf.yahooInterval,
+        )
         if (!cancelled) {
           setChart(points)
           if (points.length === 0) {
             setChartError(
-              "Historique indisponible (le plan gratuit Finnhub restreint parfois cet endpoint).",
+              "Historique indisponible pour ce symbole sur cette période.",
             )
           }
         }

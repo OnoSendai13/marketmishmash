@@ -5,7 +5,7 @@ Dashboard léger et modulaire de **suivi des marchés financiers** — cryptomon
 - ⚡ **React + Vite** : démarrage instantané avec `npm run dev`
 - 🎨 **Tailwind CSS** : interface sombre et responsive
 - 📊 **Recharts** : graphiques d'évolution avec sélecteur de période
-- 🔌 **APIs** : [CoinGecko](https://www.coingecko.com/) (crypto, sans clé) + [Finnhub](https://finnhub.io/) (actions, clé gratuite)
+- 🔌 **APIs** : [CoinGecko](https://www.coingecko.com/) (crypto, sans clé) + [Finnhub](https://finnhub.io/) (actions, prix temps réel) + [Yahoo Finance](https://finance.yahoo.com/) (historique des actions, sans clé)
 
 ---
 
@@ -203,8 +203,9 @@ marketmishmash/
 │   │   └── useStockData.js       # Récupération + rafraîchissement actions
 │   ├── services/
 │   │   ├── apiStore.js           # Magasin partagé des clés API (hors React)
-│   │   ├── coingecko.js          # Appels API CoinGecko
-│   │   └── finnhub.js            # Appels API Finnhub
+│   │   ├── coingecko.js          # Appels API CoinGecko (crypto)
+│   │   ├── finnhub.js            # Appels API Finnhub (cotation temps réel actions)
+│   │   └── yahoo.js              # Appels Yahoo Finance (historique actions)
 │   ├── config/
 │   │   ├── assets.json           # Liste configurable des actifs suivis
 │   │   ├── apiRegistry.js        # Registre des plateformes d'API connues
@@ -236,8 +237,15 @@ L'architecture est volontairement modulaire :
 
 ## 📝 Notes
 
-- Les données proviennent de **CoinGecko** et **Finnhub**. En cas de dépassement des quotas gratuits,
-  les appels peuvent être temporairement limités (erreur affichée sur les cartes).
-- L'historique des **actions** (graphique) dépend de l'endpoint `stock/candle` de Finnhub ; selon
-  votre plan gratuit, il peut être restreint — la cotation temps réel (`/quote`) reste disponible.
+- Les données proviennent de **CoinGecko**, **Finnhub** et **Yahoo Finance**. En cas de dépassement
+  des quotas gratuits, les appels peuvent être temporairement limités (erreur affichée sur les cartes).
+- Pour les **actions**, deux sources se complètent :
+  - **Finnhub** fournit la **cotation temps réel** (`/quote`, gratuit) — nécessite une clé.
+  - **Yahoo Finance** fournit l'**historique des graphiques** (24h → 1 an) — gratuit et sans clé.
+  L'endpoint `stock/candle` de Finnhub (historique) étant réservé aux plans payants, il n'est plus utilisé.
+- ⚠️ **Proxy Yahoo Finance** : Yahoo ne renvoie pas d'en-tête CORS, donc les appels passent par un
+  proxy intégré à Vite (chemin `/yahoo`, voir `vite.config.js`). Ce proxy est actif avec
+  `npm run dev` **et** `npm run preview`. En revanche, un **build statique** (`dist/`) déployé sur un
+  hébergeur classique n'a pas ce proxy : il faudrait alors un petit serveur relais (ex. un reverse-proxy
+  Nginx ou une fonction serverless) pour rediriger `/yahoo` vers `https://query1.finance.yahoo.com`.
 - Ce projet est fourni à titre **pédagogique** et ne constitue **pas un conseil en investissement**.

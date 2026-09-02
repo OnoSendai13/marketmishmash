@@ -58,6 +58,11 @@ export async function fetchStockQuote(symbol) {
 }
 
 /**
+ * @deprecated L'endpoint /stock/candle de Finnhub est réservé aux plans payants
+ * (renvoie 403 en gratuit). L'historique des actions passe désormais par
+ * Yahoo Finance : voir src/services/yahoo.js -> fetchStockChartYahoo().
+ * Conservé uniquement pour référence.
+ *
  * Récupère l'historique OHLC (bougies) d'une action.
  * @returns {{time:number, price:number}[]}  (price = clôture, time en ms)
  */
