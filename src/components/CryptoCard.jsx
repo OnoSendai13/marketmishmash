@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import PriceChart from './PriceChart'
 import TimeframeSelector from './TimeframeSelector'
 import { fetchCryptoChart } from '../services/coingecko'
@@ -10,10 +11,23 @@ import { formatPercent, formatPrice, formatVolume } from '../utils/format'
  * @param {{market:object, currency:string}} props  (market = objet /coins/markets)
  */
 export default function CryptoCard({ market, currency = 'usd' }) {
+  const navigate = useNavigate()
   const [timeframe, setTimeframe] = useState(DEFAULT_TIMEFRAME)
   const [chart, setChart] = useState([])
   const [chartLoading, setChartLoading] = useState(true)
   const [chartError, setChartError] = useState(null)
+
+  // Ticker yfinance pour l'analyse : les cryptos suivent la convention SYMBOLE-USD.
+  const yfTicker = `${(market.symbol || '').toUpperCase()}-USD`
+  const openDetail = () => {
+    const params = new URLSearchParams({
+      type: 'crypto',
+      name: market.name || market.symbol,
+      symbol: (market.symbol || '').toUpperCase(),
+      id: market.id || '',
+    })
+    navigate(`/detail/${encodeURIComponent(yfTicker)}?${params.toString()}`)
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -41,13 +55,21 @@ export default function CryptoCard({ market, currency = 'usd' }) {
 
   return (
     <div className="rounded-xl border border-white/5 bg-panel p-4 shadow-lg">
-      <div className="flex items-center justify-between">
+      <button
+        type="button"
+        onClick={openDetail}
+        title="Voir l'analyse détaillée"
+        className="group flex w-full items-center justify-between rounded-lg text-left transition-colors hover:bg-white/5 focus:outline-none focus:ring-1 focus:ring-accent"
+      >
         <div className="flex items-center gap-3">
           {market.image && (
             <img src={market.image} alt={market.name} className="h-8 w-8 rounded-full" />
           )}
           <div>
-            <div className="font-semibold">{market.name}</div>
+            <div className="font-semibold group-hover:text-accent">
+              {market.name}
+              <span className="ml-1 text-xs text-gray-500 group-hover:text-accent">↗</span>
+            </div>
             <div className="text-xs uppercase text-gray-500">{market.symbol}</div>
           </div>
         </div>
@@ -57,7 +79,7 @@ export default function CryptoCard({ market, currency = 'usd' }) {
             {formatPercent(changePct)}
           </div>
         </div>
-      </div>
+      </button>
 
       <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
         <span>Volume 24h : {formatVolume(market.total_volume, currency)}</span>

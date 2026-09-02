@@ -94,6 +94,60 @@ npm run preview   # sert la version de production en local
 
 ---
 
+## 🔬 Phase 1 — Analyse des valeurs
+
+Chaque carte du tableau de bord (crypto ou action) est désormais **cliquable** et
+ouvre une **page de détail** (`/detail/:ticker`) proposant trois onglets d'analyse :
+
+- **Analyse Technique** — graphique de cours avec moyennes mobiles (EMA 20/50/200)
+  et bandes de Bollinger, plus deux sous-graphiques RSI (zones 30/70) et MACD
+  (histogramme + signal), et un résumé des derniers indicateurs (RSI, MACD, ATR…).
+- **Fondamentaux & News** *(actions US uniquement)* — ratios financiers
+  (P/E, P/B, BPA, capitalisation, ROE, dette/capitaux, bêta…), dernières actualités
+  et **score de sentiment** (VADER) avec badges colorés (haussier / neutre / baissier).
+- **Backtest** — test de stratégies simples (**Croisement SMA 50/200** ou
+  **Retournement RSI 30/70**) avec rendement, Sharpe, drawdown max, taux de gain,
+  nombre de trades et **courbe de capital** (equity curve).
+
+Ces analyses sont fournies par un **micro-backend Python (FastAPI)** situé dans le
+dossier [`backend/`](backend/), qui s'appuie sur `yfinance` (données OHLCV),
+`pandas-ta-classic` (indicateurs), `finvizfinance` (fondamentaux + news),
+`vaderSentiment` (sentiment) et `backtesting` (backtest).
+
+### Lancer le backend d'analyse
+
+Le backend doit tourner **en parallèle** du frontend (le proxy Vite `/api` le relaie
+vers `http://localhost:8000`).
+
+```bash
+cd backend
+pip install -r requirements.txt
+uvicorn main:app --reload      # démarre l'API sur http://localhost:8000
+```
+
+Ou plus simplement, via le script fourni (crée un venv, installe et lance) :
+
+```bash
+cd backend
+./start.sh
+```
+
+Puis, dans un **autre terminal**, lancez le frontend :
+
+```bash
+npm run dev
+```
+
+> ℹ️ Les endpoints exposés : `GET /api/analysis/technical/{ticker}`,
+> `GET /api/analysis/fundamentals/{ticker}`, `GET /api/analysis/news/{ticker}`,
+> `POST /api/analysis/backtest/{ticker}`. Documentation interactive auto-générée
+> sur http://localhost:8000/docs.
+>
+> Les fondamentaux et news ne concernent que les **actions américaines** ; pour les
+> cryptos, seuls les onglets « Analyse Technique » et « Backtest » sont disponibles.
+
+---
+
 ## ⚙️ Configurer les actifs suivis
 
 ### 🖥️ Depuis l'interface (recommandé)
@@ -201,20 +255,31 @@ marketmishmash/
 │   │   ├── useApiConfig.js       # Configuration des APIs persistée en localStorage
 │   │   ├── useCryptoData.js      # Récupération + rafraîchissement crypto
 │   │   └── useStockData.js       # Récupération + rafraîchissement actions
+│   ├── pages/
+│   │   ├── DetailPage.jsx        # Page de détail d'une valeur (Phase 1, 3 onglets)
+│   │   └── tabs/
+│   │       ├── TechnicalTab.jsx  # Onglet analyse technique (RSI, MACD, Bollinger…)
+│   │       ├── FundamentalsTab.jsx # Onglet fondamentaux + news/sentiment
+│   │       └── BacktestTab.jsx   # Onglet backtest de stratégies
 │   ├── services/
 │   │   ├── apiStore.js           # Magasin partagé des clés API (hors React)
 │   │   ├── coingecko.js          # Appels API CoinGecko (crypto)
 │   │   ├── finnhub.js            # Appels API Finnhub (cotation temps réel actions)
-│   │   └── yahoo.js              # Appels Yahoo Finance (historique actions)
+│   │   ├── yahoo.js              # Appels Yahoo Finance (historique actions)
+│   │   └── analysis.js           # Appels au backend d'analyse Python (/api)
 │   ├── config/
 │   │   ├── assets.json           # Liste configurable des actifs suivis
 │   │   ├── apiRegistry.js        # Registre des plateformes d'API connues
 │   │   └── timeframes.js         # Définition des plages temporelles
 │   ├── utils/
 │   │   └── format.js             # Formatage prix / % / volume / dates
-│   ├── App.jsx
-│   ├── main.jsx
+│   ├── App.jsx                   # Routage (dashboard + page de détail)
+│   ├── main.jsx                  # Point d'entrée + BrowserRouter
 │   └── index.css
+├── backend/                      # Micro-backend d'analyse (Phase 1, FastAPI)
+│   ├── main.py                   # API : technique, fondamentaux, news, backtest
+│   ├── requirements.txt          # Dépendances Python
+│   └── start.sh                  # Script de démarrage (venv + uvicorn)
 ├── .env.example                  # Modèle de configuration (clé Finnhub)
 ├── .gitignore
 ├── index.html
