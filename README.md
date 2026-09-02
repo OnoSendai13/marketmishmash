@@ -91,7 +91,21 @@ npm run preview   # sert la version de production en local
 
 ## ⚙️ Configurer les actifs suivis
 
-La liste des actifs se trouve dans **`src/config/assets.json`**. Modifiez-la puis rechargez la page.
+### 🖥️ Depuis l'interface (recommandé)
+
+Cliquez sur le bouton **« ⚙️ Gérer mes actifs »** en haut à droite du dashboard pour ouvrir le panneau de gestion :
+
+- **Ajouter** une crypto (via son **ID CoinGecko**, ex. `bitcoin`) ou une action (via son **symbole Finnhub**, ex. `AAPL`)
+- **Supprimer** un actif suivi d'un clic
+- **Réinitialiser** la liste aux valeurs par défaut
+
+Votre liste est enregistrée automatiquement dans le **`localStorage`** du navigateur (clé `marketmishmash_assets`) : elle est conservée entre les sessions, sans modifier le code.
+
+> Le fichier `src/config/assets.json` ne sert plus que de **valeurs par défaut** au tout premier lancement (quand le `localStorage` est vide).
+
+### 📄 Valeurs par défaut (`assets.json`)
+
+La liste par défaut se trouve dans **`src/config/assets.json`**.
 
 ```json
 {
@@ -142,8 +156,10 @@ marketmishmash/
 │   │   ├── CryptoCard.jsx        # Carte d'un actif crypto + graphique
 │   │   ├── StockCard.jsx         # Carte d'une action + graphique
 │   │   ├── PriceChart.jsx        # Graphique d'évolution (Recharts)
-│   │   └── TimeframeSelector.jsx # Sélecteur 24h / 7j / 30j / 90j / 1an
+│   │   ├── TimeframeSelector.jsx # Sélecteur 24h / 7j / 30j / 90j / 1an
+│   │   └── AssetManager.jsx      # Panneau de gestion des actifs (ajout/suppression)
 │   ├── hooks/
+│   │   ├── useAssets.js          # Liste des actifs persistée en localStorage
 │   │   ├── useCryptoData.js      # Récupération + rafraîchissement crypto
 │   │   └── useStockData.js       # Récupération + rafraîchissement actions
 │   ├── services/

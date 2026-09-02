@@ -1,8 +1,10 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import CryptoCard from './CryptoCard'
 import StockCard from './StockCard'
+import AssetManager from './AssetManager'
 import { useCryptoData } from '../hooks/useCryptoData'
 import { useStockData } from '../hooks/useStockData'
+import { useAssets } from '../hooks/useAssets'
 import { formatTime } from '../utils/format'
 import assetsConfig from '../config/assets.json'
 
@@ -18,9 +20,23 @@ function SectionStatus({ loading, error, lastUpdated }) {
 }
 
 export default function Dashboard() {
-  const { crypto, stocks, settings } = assetsConfig
-  const currency = settings?.currency || 'usd'
-  const refreshMs = settings?.refreshIntervalMs || 60000
+  // Réglages globaux (devise, intervalle) : toujours issus du fichier de config.
+  const settings = assetsConfig.settings || {}
+  const currency = settings.currency || 'usd'
+  const refreshMs = settings.refreshIntervalMs || 60000
+
+  // Liste des actifs : persistée en localStorage via useAssets.
+  const {
+    crypto,
+    stocks,
+    addCrypto,
+    removeCrypto,
+    addStock,
+    removeStock,
+    reset,
+  } = useAssets()
+
+  const [managerOpen, setManagerOpen] = useState(false)
 
   const cryptoState = useCryptoData(crypto, currency, refreshMs)
   const stockState = useStockData(stocks, refreshMs)
@@ -33,15 +49,24 @@ export default function Dashboard() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6">
-      <header className="mb-8 flex flex-col gap-1 border-b border-white/5 pb-5">
-        <div className="flex items-center gap-3">
-          <img src="/favicon.svg" alt="" className="h-9 w-9" />
-          <h1 className="text-2xl font-bold tracking-tight">MarketMishmash</h1>
+      <header className="mb-8 flex flex-col gap-3 border-b border-white/5 pb-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-3">
+            <img src="/favicon.svg" alt="" className="h-9 w-9" />
+            <h1 className="text-2xl font-bold tracking-tight">MarketMishmash</h1>
+          </div>
+          <p className="text-sm text-gray-400">
+            Suivi en temps réel des marchés — crypto &amp; actions. Rafraîchissement automatique
+            toutes les {Math.round(refreshMs / 1000)} s.
+          </p>
         </div>
-        <p className="text-sm text-gray-400">
-          Suivi en temps réel des marchés — crypto &amp; actions. Rafraîchissement automatique
-          toutes les {Math.round(refreshMs / 1000)} s.
-        </p>
+        <button
+          type="button"
+          onClick={() => setManagerOpen(true)}
+          className="inline-flex shrink-0 items-center gap-2 self-start rounded-lg border border-white/10 bg-panel px-4 py-2 text-sm font-medium text-gray-200 transition-colors hover:border-accent hover:text-white sm:self-auto"
+        >
+          ⚙️ Gérer mes actifs
+        </button>
       </header>
 
       {/* Section Crypto */}
@@ -56,7 +81,11 @@ export default function Dashboard() {
             lastUpdated={cryptoState.lastUpdated}
           />
         </div>
-        {cryptoState.loading && cryptoMarkets.length === 0 ? (
+        {crypto.length === 0 ? (
+          <p className="text-sm text-gray-500">
+            Aucune crypto suivie. Cliquez sur « ⚙️ Gérer mes actifs » pour en ajouter.
+          </p>
+        ) : cryptoState.loading && cryptoMarkets.length === 0 ? (
           <p className="text-sm text-gray-500">Chargement des cryptos…</p>
         ) : (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -79,7 +108,11 @@ export default function Dashboard() {
             lastUpdated={stockState.lastUpdated}
           />
         </div>
-        {stockState.error && stockState.data.length === 0 ? (
+        {stocks.length === 0 ? (
+          <p className="text-sm text-gray-500">
+            Aucune action suivie. Cliquez sur « ⚙️ Gérer mes actifs » pour en ajouter.
+          </p>
+        ) : stockState.error && stockState.data.length === 0 ? (
           <div className="rounded-lg border border-down/30 bg-down/10 p-4 text-sm text-down">
             {stockState.error}
           </div>
@@ -98,6 +131,18 @@ export default function Dashboard() {
         Données : CoinGecko (crypto) &amp; Finnhub (actions). Projet à but pédagogique — pas un
         conseil en investissement.
       </footer>
+
+      <AssetManager
+        open={managerOpen}
+        onClose={() => setManagerOpen(false)}
+        crypto={crypto}
+        stocks={stocks}
+        onAddCrypto={addCrypto}
+        onRemoveCrypto={removeCrypto}
+        onAddStock={addStock}
+        onRemoveStock={removeStock}
+        onReset={reset}
+      />
     </div>
   )
 }
