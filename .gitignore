@@ -1,0 +1,27 @@
+# Dépendances
+node_modules/
+
+# Build
+dist/
+dist-ssr/
+
+# Variables d'environnement locales (ne jamais committer les clés !)
+.env
+.env.local
+.env.*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Cache / éditeurs
+.vite/
+.DS_Store
+*.local
+.idea/
+.vscode/
+
+# Métadonnées internes Abacus.AI (ne pas committer)
+.abacus.donotdelete
