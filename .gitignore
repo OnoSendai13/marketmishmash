@@ -22,3 +22,6 @@ pnpm-debug.log*
 *.local
 .idea/
 .vscode/
+
+# Métadonnées internes Abacus.AI (ne pas committer)
+.abacus.donotdelete

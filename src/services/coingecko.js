@@ -1,5 +1,9 @@
 // Service d'accès à l'API CoinGecko (crypto).
-// Aucune clé API n'est requise pour les endpoints publics utilisés ici.
+// Aucune clé n'est requise pour les endpoints publics. Une clé « Demo » peut
+// toutefois être configurée via l'interface (localStorage) pour augmenter le
+// quota ; elle est alors envoyée dans l'en-tête x-cg-demo-api-key.
+import { getApiKey } from './apiStore'
+
 const BASE_URL = 'https://api.coingecko.com/api/v3'
 
 async function request(path, params = {}) {
@@ -8,9 +12,12 @@ async function request(path, params = {}) {
     if (value !== undefined && value !== null) url.searchParams.set(key, value)
   })
 
-  const res = await fetch(url.toString(), {
-    headers: { Accept: 'application/json' },
-  })
+  const headers = { Accept: 'application/json' }
+  // Clé optionnelle (aucun repli .env : CoinGecko fonctionne sans clé).
+  const apiKey = getApiKey('coingecko', '')
+  if (apiKey) headers['x-cg-demo-api-key'] = apiKey
+
+  const res = await fetch(url.toString(), { headers })
 
   if (!res.ok) {
     throw new Error(`CoinGecko a répondu ${res.status} (${res.statusText})`)

@@ -2,9 +2,11 @@ import { useMemo, useState } from 'react'
 import CryptoCard from './CryptoCard'
 import StockCard from './StockCard'
 import AssetManager from './AssetManager'
+import ApiManager from './ApiManager'
 import { useCryptoData } from '../hooks/useCryptoData'
 import { useStockData } from '../hooks/useStockData'
 import { useAssets } from '../hooks/useAssets'
+import { useApiConfig } from '../hooks/useApiConfig'
 import { formatTime } from '../utils/format'
 import assetsConfig from '../config/assets.json'
 
@@ -37,9 +39,19 @@ export default function Dashboard() {
   } = useAssets()
 
   const [managerOpen, setManagerOpen] = useState(false)
+  const [apiManagerOpen, setApiManagerOpen] = useState(false)
 
-  const cryptoState = useCryptoData(crypto, currency, refreshMs)
-  const stockState = useStockData(stocks, refreshMs)
+  // Configuration des APIs : sert à savoir si Finnhub est configurée et à
+  // forcer un rechargement des données lorsqu'une clé change.
+  const { config: apiConfig, isConfigured } = useApiConfig()
+  const finnhubConfigured =
+    isConfigured('finnhub') || Boolean(import.meta.env.VITE_FINNHUB_API_KEY &&
+      import.meta.env.VITE_FINNHUB_API_KEY !== 'votre_cle_finnhub_ici')
+  // Version de config : change à chaque modification de clé -> re-fetch.
+  const apiVersion = useMemo(() => JSON.stringify(apiConfig), [apiConfig])
+
+  const cryptoState = useCryptoData(crypto, currency, refreshMs, apiVersion)
+  const stockState = useStockData(stocks, refreshMs, apiVersion)
 
   // Conserve l'ordre défini dans la config.
   const cryptoMarkets = useMemo(() => {
@@ -60,13 +72,22 @@ export default function Dashboard() {
             toutes les {Math.round(refreshMs / 1000)} s.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setManagerOpen(true)}
-          className="inline-flex shrink-0 items-center gap-2 self-start rounded-lg border border-white/10 bg-panel px-4 py-2 text-sm font-medium text-gray-200 transition-colors hover:border-accent hover:text-white sm:self-auto"
-        >
-          ⚙️ Gérer mes actifs
-        </button>
+        <div className="flex shrink-0 flex-wrap gap-2 self-start sm:self-auto">
+          <button
+            type="button"
+            onClick={() => setApiManagerOpen(true)}
+            className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-panel px-4 py-2 text-sm font-medium text-gray-200 transition-colors hover:border-accent hover:text-white"
+          >
+            🔑 Configurer les APIs
+          </button>
+          <button
+            type="button"
+            onClick={() => setManagerOpen(true)}
+            className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-panel px-4 py-2 text-sm font-medium text-gray-200 transition-colors hover:border-accent hover:text-white"
+          >
+            ⚙️ Gérer mes actifs
+          </button>
+        </div>
       </header>
 
       {/* Section Crypto */}
@@ -108,6 +129,18 @@ export default function Dashboard() {
             lastUpdated={stockState.lastUpdated}
           />
         </div>
+        {!finnhubConfigured && (
+          <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+            <span>⚠ La clé API Finnhub n'est pas configurée : les données des actions ne s'afficheront pas.</span>
+            <button
+              type="button"
+              onClick={() => setApiManagerOpen(true)}
+              className="rounded-md bg-amber-500/20 px-2 py-1 font-medium text-amber-200 transition-colors hover:bg-amber-500/30"
+            >
+              🔑 Configurer maintenant
+            </button>
+          </div>
+        )}
         {stocks.length === 0 ? (
           <p className="text-sm text-gray-500">
             Aucune action suivie. Cliquez sur « ⚙️ Gérer mes actifs » pour en ajouter.
@@ -143,6 +176,8 @@ export default function Dashboard() {
         onRemoveStock={removeStock}
         onReset={reset}
       />
+
+      <ApiManager open={apiManagerOpen} onClose={() => setApiManagerOpen(false)} />
     </div>
   )
 }

@@ -1,16 +1,27 @@
 // Service d'accès à l'API Finnhub (actions).
-// Une clé API gratuite est requise : voir README (variable VITE_FINNHUB_API_KEY).
+// La clé API est lue en priorité depuis la configuration in-app (localStorage,
+// via apiStore), avec repli sur la variable d'environnement VITE_FINNHUB_API_KEY.
+import { getApiKey } from './apiStore'
+
 const BASE_URL = 'https://finnhub.io/api/v1'
-const API_KEY = import.meta.env.VITE_FINNHUB_API_KEY
+const ENV_KEY = import.meta.env.VITE_FINNHUB_API_KEY
+
+// Résout la clé courante à chaque appel (localStorage prioritaire, puis .env).
+function resolveKey() {
+  const envFallback =
+    ENV_KEY && ENV_KEY !== 'votre_cle_finnhub_ici' ? ENV_KEY : ''
+  return getApiKey('finnhub', envFallback)
+}
 
 export function hasFinnhubKey() {
-  return Boolean(API_KEY && API_KEY.trim() && API_KEY !== 'votre_cle_finnhub_ici')
+  return Boolean(resolveKey())
 }
 
 async function request(path, params = {}) {
-  if (!hasFinnhubKey()) {
+  const apiKey = resolveKey()
+  if (!apiKey) {
     throw new Error(
-      "Clé Finnhub manquante. Renseignez VITE_FINNHUB_API_KEY dans le fichier .env",
+      "Clé Finnhub manquante. Configurez-la via « 🔑 Configurer les APIs » (ou dans le fichier .env).",
     )
   }
 
@@ -18,7 +29,7 @@ async function request(path, params = {}) {
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null) url.searchParams.set(key, value)
   })
-  url.searchParams.set('token', API_KEY)
+  url.searchParams.set('token', apiKey)
 
   const res = await fetch(url.toString(), { headers: { Accept: 'application/json' } })
   if (!res.ok) {

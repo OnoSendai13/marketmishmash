@@ -52,6 +52,11 @@ La section **Actions** utilise Finnhub, qui nécessite une clé API gratuite :
 
 > 💡 La section **Crypto** fonctionne **sans aucune clé** (CoinGecko public).
 
+> 💡 **Alternative sans fichier `.env`** : vous pouvez aussi saisir votre clé Finnhub
+> directement dans l'interface via le bouton **« 🔑 Configurer les APIs »** (voir la section
+> [Configurer les APIs](#-configurer-les-apis)). La clé est alors enregistrée dans le navigateur
+> (localStorage) et prioritaire sur le `.env`.
+
 ### 4. Configurer le fichier `.env`
 
 Copiez le fichier d'exemple puis collez votre clé Finnhub :
@@ -137,6 +142,38 @@ La liste par défaut se trouve dans **`src/config/assets.json`**.
 - `symbol` : le **ticker boursier** reconnu par Finnhub (ex. `AAPL`, `TSLA`, `NVDA`).
 - `name` : libellé libre affiché sur la carte.
 
+---
+
+## 🔑 Configurer les APIs
+
+Cliquez sur le bouton **« 🔑 Configurer les APIs »** dans l'en-tête du dashboard pour ouvrir le panneau de configuration. Il vous permet de gérer vos clés **sans jamais toucher à un fichier**.
+
+### Plateformes intégrées
+
+Le panneau liste plusieurs plateformes connues (définies dans `src/config/apiRegistry.js`) :
+
+| Plateforme | Catégorie | Clé requise |
+| ---------- | --------- | ----------- |
+| **Finnhub** | Actions | Oui |
+| **CoinGecko** | Crypto | Non (optionnelle pour plus de quota) |
+| **Alpha Vantage** | Actions | Oui |
+| **CoinMarketCap** | Crypto | Oui |
+| **Financial Modeling Prep** | Actions | Oui |
+
+Pour chaque plateforme, vous disposez : d'un badge d'état (**Configurée ✅** / **Non configurée** / **Fonctionnelle sans clé**), d'un badge de catégorie (Crypto / Actions), de liens vers la **documentation** et l'**inscription**, et d'un bouton pour **saisir / modifier / supprimer** la clé.
+
+### Ajouter une plateforme manuellement
+
+En bas du panneau, un formulaire permet d'enregistrer une plateforme non listée (**Nom**, **URL de base**, **Clé API** facultative). Elle est sauvegardée comme entrée personnalisée.
+
+### Stockage & sécurité
+
+- Les clés sont enregistrées **localement** dans le navigateur (`localStorage`, clé `marketmishmash_apis`) et **ne sont jamais transmises** ailleurs.
+- La clé Finnhub configurée ici est **prioritaire** sur la variable `VITE_FINNHUB_API_KEY` du `.env` (qui reste utilisée comme repli si le `localStorage` est vide).
+- Si Finnhub n'est pas configurée, un avertissement discret s'affiche dans la section **Actions** avec un raccourci vers le panneau.
+
+---
+
 ### Réglages généraux (`settings`)
 
 | Clé                 | Description                                        | Exemple  |
@@ -157,16 +194,20 @@ marketmishmash/
 │   │   ├── StockCard.jsx         # Carte d'une action + graphique
 │   │   ├── PriceChart.jsx        # Graphique d'évolution (Recharts)
 │   │   ├── TimeframeSelector.jsx # Sélecteur 24h / 7j / 30j / 90j / 1an
-│   │   └── AssetManager.jsx      # Panneau de gestion des actifs (ajout/suppression)
+│   │   ├── AssetManager.jsx      # Panneau de gestion des actifs (ajout/suppression)
+│   │   └── ApiManager.jsx        # Panneau de configuration des APIs (clés)
 │   ├── hooks/
 │   │   ├── useAssets.js          # Liste des actifs persistée en localStorage
+│   │   ├── useApiConfig.js       # Configuration des APIs persistée en localStorage
 │   │   ├── useCryptoData.js      # Récupération + rafraîchissement crypto
 │   │   └── useStockData.js       # Récupération + rafraîchissement actions
 │   ├── services/
+│   │   ├── apiStore.js           # Magasin partagé des clés API (hors React)
 │   │   ├── coingecko.js          # Appels API CoinGecko
 │   │   └── finnhub.js            # Appels API Finnhub
 │   ├── config/
 │   │   ├── assets.json           # Liste configurable des actifs suivis
+│   │   ├── apiRegistry.js        # Registre des plateformes d'API connues
 │   │   └── timeframes.js         # Définition des plages temporelles
 │   ├── utils/
 │   │   └── format.js             # Formatage prix / % / volume / dates

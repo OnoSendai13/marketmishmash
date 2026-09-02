@@ -7,7 +7,12 @@ import { fetchCryptoMarkets } from '../services/coingecko'
  * @param {string} currency
  * @param {number} refreshIntervalMs
  */
-export function useCryptoData(assets, currency = 'usd', refreshIntervalMs = 60000) {
+export function useCryptoData(
+  assets,
+  currency = 'usd',
+  refreshIntervalMs = 60000,
+  configVersion,
+) {
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -29,7 +34,7 @@ export function useCryptoData(assets, currency = 'usd', refreshIntervalMs = 6000
       setLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idsKey, currency])
+  }, [idsKey, currency, configVersion])
 
   useEffect(() => {
     setLoading(true)

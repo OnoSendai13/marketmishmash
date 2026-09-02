@@ -5,8 +5,10 @@ import { fetchStockQuote, hasFinnhubKey } from '../services/finnhub'
  * Hook de récupération des cotations d'actions avec rafraîchissement auto.
  * @param {{symbol:string, name:string}[]} assets
  * @param {number} refreshIntervalMs
+ * @param {*} configVersion  valeur qui, lorsqu'elle change, force un rechargement
+ *                           (ex: modification de la clé API depuis l'interface)
  */
-export function useStockData(assets, refreshIntervalMs = 60000) {
+export function useStockData(assets, refreshIntervalMs = 60000, configVersion) {
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -18,7 +20,9 @@ export function useStockData(assets, refreshIntervalMs = 60000) {
 
   const load = useCallback(async () => {
     if (!hasFinnhubKey()) {
-      setError('Clé Finnhub manquante. Renseignez VITE_FINNHUB_API_KEY dans .env')
+      setError(
+        'Clé Finnhub manquante. Configurez-la via « 🔑 Configurer les APIs ».',
+      )
       setLoading(false)
       return
     }
@@ -40,7 +44,7 @@ export function useStockData(assets, refreshIntervalMs = 60000) {
       setLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [symbolsKey])
+  }, [symbolsKey, configVersion])
 
   useEffect(() => {
     setLoading(true)
