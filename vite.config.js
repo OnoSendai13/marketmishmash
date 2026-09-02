@@ -16,6 +16,12 @@ const yahooProxy = {
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
     },
   },
+  // Proxy vers le micro-backend d'analyse Python (FastAPI, Phase 1).
+  // Lancez-le en parallèle : cd backend && ./start.sh  (port 8000).
+  '/api': {
+    target: 'http://localhost:8000',
+    changeOrigin: true,
+  },
 }
 
 export default defineConfig({

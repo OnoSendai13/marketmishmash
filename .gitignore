@@ -25,3 +25,8 @@ pnpm-debug.log*
 
 # Métadonnées internes Abacus.AI (ne pas committer)
 .abacus.donotdelete
+
+# Backend Python (Phase 1)
+backend/venv/
+__pycache__/
+*.pyc

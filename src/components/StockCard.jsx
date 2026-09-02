@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import PriceChart from './PriceChart'
 import TimeframeSelector from './TimeframeSelector'
 import { fetchStockChartYahoo } from '../services/yahoo'
@@ -10,10 +11,20 @@ import { formatPercent, formatPrice } from '../utils/format'
  * @param {{quote:object, currency:string}} props  (quote = {symbol, name, price, change, changePercent...})
  */
 export default function StockCard({ quote, currency = 'usd' }) {
+  const navigate = useNavigate()
   const [timeframe, setTimeframe] = useState(DEFAULT_TIMEFRAME)
   const [chart, setChart] = useState([])
   const [chartLoading, setChartLoading] = useState(true)
   const [chartError, setChartError] = useState(null)
+
+  const openDetail = () => {
+    const params = new URLSearchParams({
+      type: 'stock',
+      name: quote.name || quote.symbol,
+      symbol: quote.symbol,
+    })
+    navigate(`/detail/${encodeURIComponent(quote.symbol)}?${params.toString()}`)
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -52,13 +63,21 @@ export default function StockCard({ quote, currency = 'usd' }) {
 
   return (
     <div className="rounded-xl border border-white/5 bg-panel p-4 shadow-lg">
-      <div className="flex items-center justify-between">
+      <button
+        type="button"
+        onClick={openDetail}
+        title="Voir l'analyse détaillée"
+        className="group flex w-full items-center justify-between rounded-lg text-left transition-colors hover:bg-white/5 focus:outline-none focus:ring-1 focus:ring-accent"
+      >
         <div className="flex items-center gap-3">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-panel2 text-xs font-bold text-accent">
             {quote.symbol.slice(0, 3)}
           </div>
           <div>
-            <div className="font-semibold">{quote.name}</div>
+            <div className="font-semibold group-hover:text-accent">
+              {quote.name}
+              <span className="ml-1 text-xs text-gray-500 group-hover:text-accent">↗</span>
+            </div>
             <div className="text-xs uppercase text-gray-500">{quote.symbol}</div>
           </div>
         </div>
@@ -68,7 +87,7 @@ export default function StockCard({ quote, currency = 'usd' }) {
             {formatPercent(quote.changePercent)}
           </div>
         </div>
-      </div>
+      </button>
 
       <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
         <span>

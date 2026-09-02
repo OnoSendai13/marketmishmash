@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+yfinance
+pandas-ta-classic
+finvizfinance
+backtesting
+vaderSentiment
+pandas
+numpy
