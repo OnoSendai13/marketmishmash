@@ -152,6 +152,7 @@ Le backend s'appuie notamment sur `yfinance` (OHLCV), `pandas-ta-classic` (indic
 `backtesting` (backtest), `alpha_vantage` et `python-dotenv`.
 
 ### 4. Configurer la clé Alpha Vantage (news) — optionnel
+### 4. Configurer la clé Alpha Vantage (news)
 
 Les actualités avec sentiment utilisent **Alpha Vantage**. Une clé gratuite (25 requêtes/jour)
 suffit ; sans clé (ou quota épuisé), le backend bascule automatiquement sur **Finviz**.
@@ -231,6 +232,16 @@ documentation/inscription et champ de saisie de clé.
   `VITE_FINNHUB_API_KEY` du `.env` (utilisée en repli).
 - La clé **Alpha Vantage** configurée dans l'interface (header HTTP) est **prioritaire** sur
   `backend/.env` (utilisée en repli).
+| **Alpha Vantage** | News + sentiment (backend) | Optionnelle (gratuite, 25 req/jour) |
+| **Finviz** | Fondamentaux + news actions US (repli) | Non |
+
+### Stockage & sécurité
+
+- Les clés saisies dans l'interface sont enregistrées **localement** dans le navigateur
+  (`localStorage`, clé `marketmishmash_apis`) et **ne sont jamais transmises** ailleurs.
+- La clé Finnhub configurée dans l'interface est **prioritaire** sur la variable
+  `VITE_FINNHUB_API_KEY` du `.env` (utilisée en repli).
+- La clé **Alpha Vantage** se configure côté backend dans `backend/.env`.
 - **Aucune clé n'est obligatoire pour démarrer** : CoinGecko + Yahoo Finance suffisent pour
   afficher prix et graphiques.
 
