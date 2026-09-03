@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import CryptoCard from './CryptoCard'
 import StockCard from './StockCard'
 import AssetManager from './AssetManager'
@@ -40,6 +41,7 @@ export default function Dashboard() {
 
   const [managerOpen, setManagerOpen] = useState(false)
   const [apiManagerOpen, setApiManagerOpen] = useState(false)
+  const navigate = useNavigate()
 
   // Configuration des APIs : sert à savoir si Finnhub est configurée et à
   // forcer un rechargement des données lorsqu'une clé change.
@@ -73,6 +75,13 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap gap-2 self-start sm:self-auto">
+          <button
+            type="button"
+            onClick={() => navigate('/news')}
+            className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-panel px-4 py-2 text-sm font-medium text-gray-200 transition-colors hover:border-accent hover:text-white"
+          >
+            📰 Actualités
+          </button>
           <button
             type="button"
             onClick={() => setApiManagerOpen(true)}
