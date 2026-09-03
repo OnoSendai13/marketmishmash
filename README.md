@@ -25,6 +25,18 @@ bash start.sh
 
 Puis ouvre **http://localhost:9000** dans ton navigateur.
 
+> ⚠️ **Windows — autoriser les scripts PowerShell (à faire UNE FOIS)** : par défaut,
+> Windows **bloque** l'exécution des fichiers `.ps1` (`start.ps1`), d'où un backend qui
+> « ne démarre pas ». Ouvre PowerShell **en administrateur** et exécute :
+>
+> ```powershell
+> Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+> ```
+>
+> Alternative sans changer la politique globale : lancer le script en le débloquant
+> uniquement pour cette commande —
+> `powershell -ExecutionPolicy Bypass -File .\start.ps1`
+
 ### Lancer uniquement le backend
 
 ```powershell
@@ -36,9 +48,6 @@ cd backend ; .\start.ps1
 # Linux / Mac
 cd backend && bash start.sh
 ```
-
-> ℹ️ Sous Windows, si l'exécution de scripts est bloquée, autorise-la pour la session courante :
-> `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`
 
 ---
 
