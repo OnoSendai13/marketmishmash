@@ -1,10 +1,17 @@
 // Service d'accès à l'API CoinGecko (crypto).
 // Aucune clé n'est requise pour les endpoints publics. Une clé « Demo » peut
-// toutefois être configurée via l'interface (localStorage) pour augmenter le
-// quota ; elle est alors envoyée dans l'en-tête x-cg-demo-api-key.
+// toutefois être configurée pour augmenter le quota :
+//   - en priorité via l'interface (localStorage, id « coingecko »),
+//   - à défaut via la variable d'environnement VITE_COINGECKO_API_KEY (.env racine).
+// Elle est alors envoyée dans l'en-tête x-cg-demo-api-key.
 import { getApiKey } from './apiStore'
 
 const BASE_URL = 'https://api.coingecko.com/api/v3'
+
+// Repli .env (ignoré s'il vaut le placeholder du .env.example).
+const ENV_KEY = import.meta.env.VITE_COINGECKO_API_KEY
+const ENV_FALLBACK =
+  ENV_KEY && ENV_KEY !== 'votre_cle_coingecko_ici' ? ENV_KEY : ''
 
 async function request(path, params = {}) {
   const url = new URL(BASE_URL + path)
@@ -13,8 +20,8 @@ async function request(path, params = {}) {
   })
 
   const headers = { Accept: 'application/json' }
-  // Clé optionnelle (aucun repli .env : CoinGecko fonctionne sans clé).
-  const apiKey = getApiKey('coingecko', '')
+  // Clé optionnelle : interface (localStorage) prioritaire, puis repli .env.
+  const apiKey = getApiKey('coingecko', ENV_FALLBACK)
   if (apiKey) headers['x-cg-demo-api-key'] = apiKey
 
   const res = await fetch(url.toString(), { headers })

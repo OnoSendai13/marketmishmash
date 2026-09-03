@@ -151,41 +151,63 @@ Le backend s'appuie notamment sur `yfinance` (OHLCV), `pandas-ta-classic` (indic
 `finvizfinance` (fondamentaux + news de repli), `vaderSentiment` (sentiment),
 `backtesting` (backtest), `alpha_vantage` et `python-dotenv`.
 
-### 4. Configurer la clé Alpha Vantage (news) — optionnel
-### 4. Configurer la clé Alpha Vantage (news)
+### 4. Configurer les clés API — optionnel
 
-Les actualités avec sentiment utilisent **Alpha Vantage**. Une clé gratuite (25 requêtes/jour)
-suffit ; sans clé (ou quota épuisé), le backend bascule automatiquement sur **Finviz**.
+**Aucune clé n'est obligatoire pour démarrer** : CoinGecko (crypto) et Yahoo Finance
+(historique des actions) fonctionnent sans clé. Les clés servent à débloquer les cotations
+d'actions (Finnhub) et à améliorer les news (Alpha Vantage) ; à défaut, des replis
+automatiques prennent le relais.
 
-**Deux méthodes de configuration (au choix) :**
+Chaque clé peut se configurer de **deux manières** (au choix) : via l'**interface**
+(bouton **« 🔑 Configurer les APIs »**, stockage dans le navigateur) ou via un fichier
+**`.env`**. La clé saisie dans l'interface est **toujours prioritaire** sur le `.env`.
 
-**Méthode 1 — Via l'interface (recommandée, prioritaire)** :
-- Clique sur le bouton **« 🔑 Configurer les APIs »** dans le dashboard
-- Sélectionne **Alpha Vantage** et saisis ta clé
-- La clé est enregistrée dans le navigateur (`localStorage`) et envoyée au backend via header HTTP
+⚠️ **Point clé à ne pas confondre** : les clés du **frontend** vont dans le `.env` à la
+**racine** (préfixe `VITE_`), tandis que la clé **Alpha Vantage** est une clé **backend**
+et va dans **`backend/.env`** (sans préfixe). Le tableau ci-dessous récapitule tout.
 
-**Méthode 2 — Via `backend/.env` (fallback)** :
+| API | Rôle | Côté | Clé ? | Interface (localStorage) | Variable `.env` | Fichier `.env` |
+| --- | --- | --- | --- | --- | --- | --- |
+| **CoinGecko** | Prix & historiques crypto | Frontend | Optionnelle (+ de quota) | ✅ `coingecko` | `VITE_COINGECKO_API_KEY` | racine `.env` |
+| **Yahoo Finance** | Historique OHLCV actions | Frontend | ❌ aucune | — | — | — (proxy Vite `/yahoo`) |
+| **Finnhub** | Cotations temps réel actions | Frontend | Recommandée (gratuite) | ✅ `finnhub` | `VITE_FINNHUB_API_KEY` | racine `.env` |
+| **Alpha Vantage** | News + sentiment | **Backend** | Optionnelle (25 req/j) | ✅ `alphavantage` (→ header HTTP) | `ALPHA_VANTAGE_API_KEY` | **`backend/.env`** |
+| **Finviz** | Fondamentaux + news de repli | Backend | ❌ aucune | — | — | — |
+| **CoinMarketCap** | Données de marché crypto | Frontend | Oui | ✅ `coinmarketcap` | *(non lue à ce jour)* | *(interface uniquement)* |
+| **Financial Modeling Prep** | Fondamentaux / données actions | Frontend | Oui | ✅ `fmp` | *(non lue à ce jour)* | *(interface uniquement)* |
+
+> ℹ️ **CoinMarketCap** et **FMP** apparaissent dans le panneau « 🔑 Configurer les APIs »
+> (leur clé se saisit alors dans l'interface) mais ne sont **pas encore branchés** à un
+> service de données : aucune variable `.env` n'est lue pour ces deux plateformes à ce jour.
+
+**Méthode `.env` — frontend (racine)** :
 
 ```bash
-# Depuis le dossier backend/
 cp .env.example .env            # Linux / Mac
 # copy .env.example .env        # Windows (PowerShell)
 ```
 
-Ouvre `backend/.env` et renseigne ta clé :
-
 ```env
-ALPHA_VANTAGE_API_KEY=ta_cle_ici
+VITE_FINNHUB_API_KEY=ta_cle_finnhub
+VITE_COINGECKO_API_KEY=ta_cle_coingecko   # optionnelle
 ```
 
-> 💡 **Priorité** : la clé configurée dans l'interface a la priorité sur `backend/.env`.
->
-> ⚠️ Le fichier `backend/.env` est ignoré par Git : ta clé ne sera jamais committée.
-> Obtiens une clé gratuite sur **https://www.alphavantage.co/support/#api-key**.
+**Méthode `.env` — backend (Alpha Vantage)** :
 
-> 💡 Le frontend possède aussi un fichier `.env.example` à la racine pour une clé
-> **Finnhub** optionnelle (`VITE_FINNHUB_API_KEY`). Elle peut également se configurer
-> directement dans l'interface (voir ci-dessous).
+```bash
+cd backend
+cp .env.example .env            # Linux / Mac
+# copy .env.example .env        # Windows (PowerShell)
+```
+
+```env
+ALPHA_VANTAGE_API_KEY=ta_cle_alpha_vantage
+```
+
+> ⚠️ Les fichiers `.env` (racine **et** `backend/`) sont ignorés par Git : tes clés ne
+> seront jamais committées. Obtiens des clés gratuites sur
+> [Finnhub](https://finnhub.io/register), [CoinGecko](https://www.coingecko.com/en/api/pricing)
+> et [Alpha Vantage](https://www.alphavantage.co/support/#api-key).
 
 ### 5. Lancer l'application
 
@@ -216,32 +238,28 @@ tes clés **sans jamais toucher à un fichier**. Le panneau liste plusieurs plat
 (définies dans `src/config/apiRegistry.js`), avec badge d'état, catégorie, liens vers la
 documentation/inscription et champ de saisie de clé.
 
-| Plateforme | Rôle | Clé requise |
-| ---------- | ---- | ----------- |
-| **CoinGecko** | Prix crypto temps réel + historiques | Non (optionnelle pour plus de quota) |
-| **Yahoo Finance** | Historique OHLCV des actions | Non (via proxy Vite) |
-| **Finnhub** | Cotations temps réel des actions | Optionnelle (gratuite) |
-| **Alpha Vantage** | News + sentiment | Optionnelle (gratuite, 25 req/jour) |
-| **Finviz** | Fondamentaux + news actions US (repli) | Non |
+| Plateforme | Rôle | Clé requise | Repli `.env` |
+| ---------- | ---- | ----------- | ------------ |
+| **CoinGecko** | Prix crypto temps réel + historiques | Non (optionnelle pour plus de quota) | `VITE_COINGECKO_API_KEY` (racine) |
+| **Yahoo Finance** | Historique OHLCV des actions | Non (via proxy Vite) | — |
+| **Finnhub** | Cotations temps réel des actions | Optionnelle (gratuite) | `VITE_FINNHUB_API_KEY` (racine) |
+| **Alpha Vantage** | News + sentiment | Optionnelle (gratuite, 25 req/jour) | `ALPHA_VANTAGE_API_KEY` (`backend/.env`) |
+| **Finviz** | Fondamentaux + news actions US (repli) | Non | — |
+| **CoinMarketCap** | Données de marché crypto | Oui | *(interface uniquement, non branchée)* |
+| **Financial Modeling Prep** | Fondamentaux / données actions | Oui | *(interface uniquement, non branchée)* |
+
+> Le détail complet (côté frontend/backend, nom exact des variables, fichier `.env`
+> concerné) est donné dans la section [4. Configurer les clés API](#4-configurer-les-clés-api--optionnel).
 
 ### Stockage & sécurité
 
 - Les clés saisies dans l'interface sont enregistrées **localement** dans le navigateur
-  (`localStorage`, clé `marketmishmash_apis`) et **ne sont jamais transmises** ailleurs.
-- La clé **Finnhub** configurée dans l'interface est **prioritaire** sur la variable
-  `VITE_FINNHUB_API_KEY` du `.env` (utilisée en repli).
-- La clé **Alpha Vantage** configurée dans l'interface (header HTTP) est **prioritaire** sur
-  `backend/.env` (utilisée en repli).
-| **Alpha Vantage** | News + sentiment (backend) | Optionnelle (gratuite, 25 req/jour) |
-| **Finviz** | Fondamentaux + news actions US (repli) | Non |
-
-### Stockage & sécurité
-
-- Les clés saisies dans l'interface sont enregistrées **localement** dans le navigateur
-  (`localStorage`, clé `marketmishmash_apis`) et **ne sont jamais transmises** ailleurs.
-- La clé Finnhub configurée dans l'interface est **prioritaire** sur la variable
-  `VITE_FINNHUB_API_KEY` du `.env` (utilisée en repli).
-- La clé **Alpha Vantage** se configure côté backend dans `backend/.env`.
+  (`localStorage`, clé `marketmishmash_apis`) et **ne sont jamais transmises** ailleurs
+  (hormis, pour Alpha Vantage, l'envoi au backend local via le header `X-Alpha-Vantage-Key`).
+- Toute clé configurée dans l'interface est **prioritaire** sur son repli `.env` :
+  Finnhub/CoinGecko sur le `.env` racine, Alpha Vantage sur `backend/.env`.
+- Les fichiers `.env` (racine **et** `backend/`) sont **ignorés par Git** : aucune clé n'est
+  jamais committée.
 - **Aucune clé n'est obligatoire pour démarrer** : CoinGecko + Yahoo Finance suffisent pour
   afficher prix et graphiques.
 
@@ -337,11 +355,11 @@ marketmishmash/
 │   ├── requirements.txt           # Dépendances Python
 │   ├── start.ps1                  # Script de démarrage Windows (venv + uvicorn)
 │   ├── start.sh                   # Script de démarrage Linux/Mac (venv + uvicorn)
-│   ├── .env.example               # Modèle de configuration (clé Alpha Vantage)
+│   ├── .env.example               # Modèle de config backend (Alpha Vantage)
 │   └── .env                       # Clé réelle (ignoré par Git)
 ├── start.ps1                      # Lance backend + frontend (Windows)
 ├── start.sh                       # Lance backend + frontend (Linux/Mac)
-├── .env.example                   # Modèle de configuration frontend (clé Finnhub)
+├── .env.example                   # Modèle de config frontend (Finnhub, CoinGecko)
 ├── .gitignore
 ├── index.html
 ├── package.json
