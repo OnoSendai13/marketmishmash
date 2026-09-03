@@ -46,6 +46,19 @@ export function fetchNewsAV(ticker) {
   return getJson(`${BASE}/news_av/${encodeURIComponent(ticker)}`)
 }
 
+/** News marché global (multi-topics Alpha Vantage, fallback finviz). */
+export function fetchGlobalNews(topics, limit = 50) {
+  const params = { limit: String(limit) }
+  if (topics) params.topics = topics
+  const q = new URLSearchParams(params)
+  return getJson(`/api/news/global?${q}`)
+}
+
+/** Liste des topics disponibles pour le filtrage. */
+export function fetchNewsTopics() {
+  return getJson('/api/news/topics')
+}
+
 /** Backtest d'une stratégie (sma_cross | rsi_reversal). */
 export function runBacktest(ticker, body) {
   return getJson(`${BASE}/backtest/${encodeURIComponent(ticker)}`, {

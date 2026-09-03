@@ -7,6 +7,7 @@ API FastAPI fournissant l'analyse des valeurs (actions et crypto) au frontend :
   - Fair Value Gaps / FVG (Smart Money Concepts)
   - Fondamentaux (finvizfinance) : ratios financiers des actions US
   - News + sentiment (finvizfinance + VADER, et Alpha Vantage NEWS_SENTIMENT)
+  - News marché global (multi-topics Alpha Vantage, fallback finvizfinance)
   - Backtest de stratégies simples (backtesting.py)
 
 Lancement :  uvicorn main:app --reload --port 9100
@@ -477,6 +478,205 @@ def _av_label_from_score(score: float) -> str:
     if score <= -0.15:
         return "Bearish"
     return "Neutral"
+
+
+# ---------------------------------------------------------------------------
+# 3ter) News marché global (indépendant du ticker)
+# ---------------------------------------------------------------------------
+# Cache mémoire simple : { cache_key: (timestamp_epoch, payload) }.
+_GLOBAL_NEWS_CACHE: dict[str, tuple[float, dict]] = {}
+_GLOBAL_NEWS_TTL = 15 * 60  # 15 minutes
+
+# Topics proposés au frontend pour le filtrage (libellé FR -> topics Alpha Vantage).
+NEWS_TOPICS_FR = [
+    "Tous",
+    "Marchés",
+    "Macro",
+    "Technologie",
+    "Earnings",
+    "IPO",
+    "Crypto",
+    "Forex",
+]
+
+
+def _av_fetch_topics(topics: str, limit: int) -> list[dict]:
+    """Appelle Alpha Vantage NEWS_SENTIMENT pour un jeu de topics (sans ticker).
+
+    Lève une exception en cas d'échec ou de quota dépassé (feed absent).
+    """
+    url = "https://www.alphavantage.co/query"
+    params = {
+        "function": "NEWS_SENTIMENT",
+        "topics": topics,
+        "apikey": ALPHA_VANTAGE_API_KEY,
+        "limit": limit,
+        "sort": "LATEST",
+    }
+    resp = requests.get(url, params=params, timeout=20)
+    resp.raise_for_status()
+    raw = resp.json()
+    if "feed" not in raw:
+        note = raw.get("Information") or raw.get("Note") or raw.get("Error Message")
+        raise RuntimeError(note or "Réponse Alpha Vantage sans feed")
+    return raw.get("feed", []) or []
+
+
+def _normalize_av_article(art: dict) -> dict:
+    """Transforme un article Alpha Vantage vers le format renvoyé par notre API."""
+    tickers = []
+    for ts in art.get("ticker_sentiment", []) or []:
+        sym = str(ts.get("ticker", "")).strip()
+        if sym:
+            tickers.append(sym)
+    return {
+        "title": art.get("title", ""),
+        "url": art.get("url", ""),
+        "time_published": art.get("time_published", ""),
+        "source": art.get("source", ""),
+        "summary": art.get("summary", ""),
+        "overall_sentiment_score": _clean_float(art.get("overall_sentiment_score")),
+        "overall_sentiment_label": art.get("overall_sentiment_label", "Neutral"),
+        "tickers_mentioned": tickers[:8],
+    }
+
+
+def _finviz_global_fallback(limit: int) -> list[dict]:
+    """Fallback : récupère les dernières headlines globales via finvizfinance."""
+    from finvizfinance.news import News
+
+    data = News().get_news()
+    df = data.get("news") if isinstance(data, dict) else None
+    if df is None or df.empty:
+        return []
+
+    items = []
+    for _, row in df.head(limit).iterrows():
+        title = " ".join(str(row.get("Title", "")).split())
+        if not title:
+            continue
+        compound = _vader.polarity_scores(title)["compound"]
+        items.append(
+            {
+                "title": title,
+                "url": str(row.get("Link", "")),
+                "time_published": str(row.get("Date", "")),
+                "source": str(row.get("Source", "")),
+                "summary": "",
+                "overall_sentiment_score": round(compound, 4),
+                "overall_sentiment_label": _av_label_from_score(compound),
+                "tickers_mentioned": [],
+            }
+        )
+    return items
+
+
+@app.get("/api/news/topics")
+def news_topics() -> dict:
+    """Retourne la liste des topics disponibles pour le filtrage côté frontend."""
+    return {"topics": NEWS_TOPICS_FR}
+
+
+@app.get("/api/news/global")
+def news_global(
+    topics: str = "financial_markets,earnings,economy_macro",
+    limit: int = 50,
+) -> dict:
+    """Retourne les news marché global (indépendantes d'un ticker).
+
+    - Interroge Alpha Vantage NEWS_SENTIMENT sur deux jeux de topics (les topics
+      demandés + technology,ipo) pour couvrir marchés + tech/IPO.
+    - Fusionne, déduplique par URL, trie par date décroissante.
+    - Cache mémoire 15 minutes.
+    - Fallback finvizfinance si le quota Alpha Vantage est dépassé.
+    """
+    limit = max(1, min(int(limit), 200))
+    key = f"{topics}|{limit}"
+    now = time.time()
+
+    cached = _GLOBAL_NEWS_CACHE.get(key)
+    if cached is not None and (now - cached[0]) < _GLOBAL_NEWS_TTL:
+        payload = dict(cached[1])
+        payload["cached"] = True
+        return payload
+
+    provider = "alphavantage"
+    articles: list[dict] = []
+    fallback_reason: Optional[str] = None
+
+    if ALPHA_VANTAGE_API_KEY:
+        try:
+            feeds: list[dict] = []
+            feeds.extend(_av_fetch_topics(topics, limit))
+            # Second appel pour couvrir tech + IPO.
+            try:
+                feeds.extend(_av_fetch_topics("technology,ipo", limit))
+            except Exception:
+                # Un échec du second appel (souvent quota) ne doit pas tout casser
+                # si le premier a réussi.
+                pass
+            if not feeds:
+                raise RuntimeError("Aucun article renvoyé par Alpha Vantage")
+            articles = [_normalize_av_article(a) for a in feeds]
+        except Exception as exc:
+            fallback_reason = str(exc)
+            articles = []
+    else:
+        fallback_reason = "Clé Alpha Vantage absente"
+
+    if not articles:
+        # Fallback finvizfinance (headlines globales + sentiment VADER sur le titre).
+        try:
+            articles = _finviz_global_fallback(limit)
+            provider = "finviz"
+        except Exception as exc:
+            raise HTTPException(
+                status_code=502,
+                detail=(
+                    "Impossible de récupérer les news globales "
+                    f"(Alpha Vantage : {fallback_reason} ; finviz : {exc})."
+                ),
+            )
+
+    # Déduplication par URL (en conservant le premier vu).
+    seen: set[str] = set()
+    deduped: list[dict] = []
+    for art in articles:
+        u = (art.get("url") or "").strip()
+        dedup_key = u or art.get("title", "")
+        if dedup_key in seen:
+            continue
+        seen.add(dedup_key)
+        deduped.append(art)
+
+    # Tri par date décroissante (time_published Alpha Vantage = "YYYYMMDDTHHMMSS").
+    def _sort_key(a: dict) -> str:
+        return str(a.get("time_published", ""))
+
+    deduped.sort(key=_sort_key, reverse=True)
+    deduped = deduped[:limit]
+
+    scores = [
+        a["overall_sentiment_score"]
+        for a in deduped
+        if a.get("overall_sentiment_score") is not None
+    ]
+    avg = float(np.mean(scores)) if scores else 0.0
+
+    payload = {
+        "provider": provider,
+        "topics": topics,
+        "count": len(deduped),
+        "average_score": round(avg, 4),
+        "average_label": _av_label_from_score(avg),
+        "items": deduped,
+        "cached": False,
+    }
+    if fallback_reason and provider == "finviz":
+        payload["fallback_reason"] = fallback_reason
+
+    _GLOBAL_NEWS_CACHE[key] = (now, payload)
+    return payload
 
 
 # ---------------------------------------------------------------------------
