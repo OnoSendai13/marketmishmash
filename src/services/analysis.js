@@ -35,6 +35,17 @@ export function fetchNews(ticker) {
   return getJson(`${BASE}/news/${encodeURIComponent(ticker)}`)
 }
 
+/** Fair Value Gaps (zones FVG — Smart Money Concepts). */
+export function fetchFVG(ticker, period = '3mo', interval = '1d') {
+  const q = new URLSearchParams({ period, interval })
+  return getJson(`${BASE}/fvg/${encodeURIComponent(ticker)}?${q}`)
+}
+
+/** News + sentiment via Alpha Vantage (NEWS_SENTIMENT, cache 15 min côté backend). */
+export function fetchNewsAV(ticker) {
+  return getJson(`${BASE}/news_av/${encodeURIComponent(ticker)}`)
+}
+
 /** Backtest d'une stratégie (sma_cross | rsi_reversal). */
 export function runBacktest(ticker, body) {
   return getJson(`${BASE}/backtest/${encodeURIComponent(ticker)}`, {
