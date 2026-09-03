@@ -25,7 +25,7 @@ import pandas as pd
 import requests
 import yfinance as yf
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -62,6 +62,26 @@ _vader = SentimentIntensityAnalyzer()
 # ---------------------------------------------------------------------------
 # Utilitaires
 # ---------------------------------------------------------------------------
+def get_alpha_vantage_key(request: Request) -> Optional[str]:
+    """Résout la clé Alpha Vantage depuis le header HTTP ou la variable d'environnement.
+    
+    Priorité :
+    1. Header 'X-Alpha-Vantage-Key' (configuré via l'interface utilisateur)
+    2. Variable d'environnement ALPHA_VANTAGE_API_KEY (configurée dans backend/.env)
+    
+    Returns:
+        La clé API si disponible, None sinon.
+    """
+    # Priorité 1 : header HTTP envoyé par le frontend (localStorage)
+    header_key = request.headers.get("X-Alpha-Vantage-Key")
+    if header_key:
+        return header_key.strip()
+    
+    # Priorité 2 : variable d'environnement (.env)
+    return ALPHA_VANTAGE_API_KEY
+
+
+
 def _clean_float(value: Any) -> Optional[float]:
     """Convertit une valeur en float JSON-sûr (NaN/inf -> None)."""
     try:
@@ -376,10 +396,14 @@ _AV_CACHE_TTL = 15 * 60  # 15 minutes
 
 
 @app.get("/api/analysis/news_av/{ticker}")
-def news_alpha_vantage(ticker: str) -> dict:
+def news_alpha_vantage(ticker: str, request: Request) -> dict:
     """Retourne les dernières news + sentiment via l'API Alpha Vantage (NEWS_SENTIMENT).
 
     Le résultat est mis en cache 15 minutes par ticker pour préserver le quota API.
+    
+    La clé Alpha Vantage peut être fournie soit :
+    - via le header HTTP 'X-Alpha-Vantage-Key' (priorité, configurée dans l'interface)
+    - via la variable d'environnement ALPHA_VANTAGE_API_KEY (backend/.env)
     """
     key = ticker.upper()
     now = time.time()
@@ -391,17 +415,18 @@ def news_alpha_vantage(ticker: str) -> dict:
         payload["cached"] = True
         return payload
 
-    if not ALPHA_VANTAGE_API_KEY:
+    api_key = get_alpha_vantage_key(request)
+    if not api_key:
         raise HTTPException(
             status_code=503,
-            detail="Clé Alpha Vantage absente : définissez ALPHA_VANTAGE_API_KEY dans backend/.env.",
+            detail="Clé Alpha Vantage absente : configurez-la via l'interface (🔑 Configurer les APIs) ou dans backend/.env.",
         )
 
     url = "https://www.alphavantage.co/query"
     params = {
         "function": "NEWS_SENTIMENT",
         "tickers": key,
-        "apikey": ALPHA_VANTAGE_API_KEY,
+        "apikey": api_key,
         "limit": 20,
     }
     try:
@@ -500,7 +525,7 @@ NEWS_TOPICS_FR = [
 ]
 
 
-def _av_fetch_topics(topics: str, limit: int) -> list[dict]:
+def _av_fetch_topics(topics: str, limit: int, api_key: str) -> list[dict]:
     """Appelle Alpha Vantage NEWS_SENTIMENT pour un jeu de topics (sans ticker).
 
     Lève une exception en cas d'échec ou de quota dépassé (feed absent).
@@ -509,7 +534,7 @@ def _av_fetch_topics(topics: str, limit: int) -> list[dict]:
     params = {
         "function": "NEWS_SENTIMENT",
         "topics": topics,
-        "apikey": ALPHA_VANTAGE_API_KEY,
+        "apikey": api_key,
         "limit": limit,
         "sort": "LATEST",
     }
@@ -579,6 +604,7 @@ def news_topics() -> dict:
 
 @app.get("/api/news/global")
 def news_global(
+    request: Request,
     topics: str = "financial_markets,earnings,economy_macro",
     limit: int = 50,
 ) -> dict:
@@ -589,6 +615,10 @@ def news_global(
     - Fusionne, déduplique par URL, trie par date décroissante.
     - Cache mémoire 15 minutes.
     - Fallback finvizfinance si le quota Alpha Vantage est dépassé.
+    
+    La clé Alpha Vantage peut être fournie soit :
+    - via le header HTTP 'X-Alpha-Vantage-Key' (priorité, configurée dans l'interface)
+    - via la variable d'environnement ALPHA_VANTAGE_API_KEY (backend/.env)
     """
     limit = max(1, min(int(limit), 200))
     key = f"{topics}|{limit}"
@@ -604,13 +634,14 @@ def news_global(
     articles: list[dict] = []
     fallback_reason: Optional[str] = None
 
-    if ALPHA_VANTAGE_API_KEY:
+    api_key = get_alpha_vantage_key(request)
+    if api_key:
         try:
             feeds: list[dict] = []
-            feeds.extend(_av_fetch_topics(topics, limit))
+            feeds.extend(_av_fetch_topics(topics, limit, api_key))
             # Second appel pour couvrir tech + IPO.
             try:
-                feeds.extend(_av_fetch_topics("technology,ipo", limit))
+                feeds.extend(_av_fetch_topics("technology,ipo", limit, api_key))
             except Exception:
                 # Un échec du second appel (souvent quota) ne doit pas tout casser
                 # si le premier a réussi.
@@ -622,7 +653,7 @@ def news_global(
             fallback_reason = str(exc)
             articles = []
     else:
-        fallback_reason = "Clé Alpha Vantage absente"
+        fallback_reason = "Clé Alpha Vantage absente (configurez-la via l'interface ou backend/.env)"
 
     if not articles:
         # Fallback finvizfinance (headlines globales + sentiment VADER sur le titre).

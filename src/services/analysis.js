@@ -2,9 +2,21 @@
 // En développement, Vite proxifie « /api » vers http://localhost:9100
 // (voir vite.config.js). Le backend doit donc être lancé en parallèle.
 
+import { getApiKey } from './apiStore.js'
+
 const BASE = '/api/analysis'
 
-async function getJson(url, options) {
+/**
+ * Retourne les headers HTTP pour Alpha Vantage.
+ * Si la clé est configurée dans l'interface (localStorage), elle est envoyée
+ * via le header 'X-Alpha-Vantage-Key' qui a la priorité sur backend/.env.
+ */
+function getAlphaVantageHeaders() {
+  const key = getApiKey('alphavantage')
+  return key ? { 'X-Alpha-Vantage-Key': key } : {}
+}
+
+async function getJson(url, options = {}) {
   const res = await fetch(url, options)
   if (!res.ok) {
     let detail = `${res.status} ${res.statusText}`
@@ -43,7 +55,9 @@ export function fetchFVG(ticker, period = '3mo', interval = '1d') {
 
 /** News + sentiment via Alpha Vantage (NEWS_SENTIMENT, cache 15 min côté backend). */
 export function fetchNewsAV(ticker) {
-  return getJson(`${BASE}/news_av/${encodeURIComponent(ticker)}`)
+  return getJson(`${BASE}/news_av/${encodeURIComponent(ticker)}`, {
+    headers: getAlphaVantageHeaders(),
+  })
 }
 
 /** News marché global (multi-topics Alpha Vantage, fallback finviz). */
@@ -51,7 +65,9 @@ export function fetchGlobalNews(topics, limit = 50) {
   const params = { limit: String(limit) }
   if (topics) params.topics = topics
   const q = new URLSearchParams(params)
-  return getJson(`/api/news/global?${q}`)
+  return getJson(`/api/news/global?${q}`, {
+    headers: getAlphaVantageHeaders(),
+  })
 }
 
 /** Liste des topics disponibles pour le filtrage. */
