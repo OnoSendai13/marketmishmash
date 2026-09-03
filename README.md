@@ -151,10 +151,20 @@ Le backend s'appuie notamment sur `yfinance` (OHLCV), `pandas-ta-classic` (indic
 `finvizfinance` (fondamentaux + news de repli), `vaderSentiment` (sentiment),
 `backtesting` (backtest), `alpha_vantage` et `python-dotenv`.
 
+### 4. Configurer la clé Alpha Vantage (news) — optionnel
 ### 4. Configurer la clé Alpha Vantage (news)
 
 Les actualités avec sentiment utilisent **Alpha Vantage**. Une clé gratuite (25 requêtes/jour)
 suffit ; sans clé (ou quota épuisé), le backend bascule automatiquement sur **Finviz**.
+
+**Deux méthodes de configuration (au choix) :**
+
+**Méthode 1 — Via l'interface (recommandée, prioritaire)** :
+- Clique sur le bouton **« 🔑 Configurer les APIs »** dans le dashboard
+- Sélectionne **Alpha Vantage** et saisis ta clé
+- La clé est enregistrée dans le navigateur (`localStorage`) et envoyée au backend via header HTTP
+
+**Méthode 2 — Via `backend/.env` (fallback)** :
 
 ```bash
 # Depuis le dossier backend/
@@ -168,6 +178,8 @@ Ouvre `backend/.env` et renseigne ta clé :
 ALPHA_VANTAGE_API_KEY=ta_cle_ici
 ```
 
+> 💡 **Priorité** : la clé configurée dans l'interface a la priorité sur `backend/.env`.
+>
 > ⚠️ Le fichier `backend/.env` est ignoré par Git : ta clé ne sera jamais committée.
 > Obtiens une clé gratuite sur **https://www.alphavantage.co/support/#api-key**.
 
@@ -209,6 +221,17 @@ documentation/inscription et champ de saisie de clé.
 | **CoinGecko** | Prix crypto temps réel + historiques | Non (optionnelle pour plus de quota) |
 | **Yahoo Finance** | Historique OHLCV des actions | Non (via proxy Vite) |
 | **Finnhub** | Cotations temps réel des actions | Optionnelle (gratuite) |
+| **Alpha Vantage** | News + sentiment | Optionnelle (gratuite, 25 req/jour) |
+| **Finviz** | Fondamentaux + news actions US (repli) | Non |
+
+### Stockage & sécurité
+
+- Les clés saisies dans l'interface sont enregistrées **localement** dans le navigateur
+  (`localStorage`, clé `marketmishmash_apis`) et **ne sont jamais transmises** ailleurs.
+- La clé **Finnhub** configurée dans l'interface est **prioritaire** sur la variable
+  `VITE_FINNHUB_API_KEY` du `.env` (utilisée en repli).
+- La clé **Alpha Vantage** configurée dans l'interface (header HTTP) est **prioritaire** sur
+  `backend/.env` (utilisée en repli).
 | **Alpha Vantage** | News + sentiment (backend) | Optionnelle (gratuite, 25 req/jour) |
 | **Finviz** | Fondamentaux + news actions US (repli) | Non |
 
