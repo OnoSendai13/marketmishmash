@@ -9,6 +9,39 @@ Dashboard léger et modulaire de **suivi des marchés financiers** — cryptomon
 
 ---
 
+## ▶️ Lancement rapide
+
+Lance le backend (FastAPI, port **9100**) **et** le frontend (Vite, port **9000**) en une seule commande :
+
+```powershell
+# Windows (PowerShell)
+.\start.ps1
+```
+
+```bash
+# Linux / Mac
+bash start.sh
+```
+
+Puis ouvre **http://localhost:9000** dans ton navigateur.
+
+### Lancer uniquement le backend
+
+```powershell
+# Windows (PowerShell)
+cd backend ; .\start.ps1
+```
+
+```bash
+# Linux / Mac
+cd backend && bash start.sh
+```
+
+> ℹ️ Sous Windows, si l'exécution de scripts est bloquée, autorise-la pour la session courante :
+> `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`
+
+---
+
 ## ✨ Fonctionnalités
 
 - Deux sections : **Crypto** et **Actions**
