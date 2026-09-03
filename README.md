@@ -9,6 +9,39 @@ Dashboard léger et modulaire de **suivi des marchés financiers** — cryptomon
 
 ---
 
+## ▶️ Lancement rapide
+
+Lance le backend (FastAPI, port **9100**) **et** le frontend (Vite, port **9000**) en une seule commande :
+
+```powershell
+# Windows (PowerShell)
+.\start.ps1
+```
+
+```bash
+# Linux / Mac
+bash start.sh
+```
+
+Puis ouvre **http://localhost:9000** dans ton navigateur.
+
+### Lancer uniquement le backend
+
+```powershell
+# Windows (PowerShell)
+cd backend ; .\start.ps1
+```
+
+```bash
+# Linux / Mac
+cd backend && bash start.sh
+```
+
+> ℹ️ Sous Windows, si l'exécution de scripts est bloquée, autorise-la pour la session courante :
+> `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`
+
+---
+
 ## ✨ Fonctionnalités
 
 - Deux sections : **Crypto** et **Actions**
@@ -83,7 +116,7 @@ VITE_FINNHUB_API_KEY=votre_cle_finnhub_ici
 npm run dev
 ```
 
-Ouvrez l'URL affichée dans le terminal (par défaut **http://localhost:5173**).
+Ouvrez l'URL affichée dans le terminal (par défaut **http://localhost:9000**).
 
 Pour générer une version de production :
 
@@ -117,12 +150,12 @@ dossier [`backend/`](backend/), qui s'appuie sur `yfinance` (données OHLCV),
 ### Lancer le backend d'analyse
 
 Le backend doit tourner **en parallèle** du frontend (le proxy Vite `/api` le relaie
-vers `http://localhost:8000`).
+vers `http://localhost:9100`).
 
 ```bash
 cd backend
 pip install -r requirements.txt
-uvicorn main:app --reload      # démarre l'API sur http://localhost:8000
+uvicorn main:app --reload      # démarre l'API sur http://localhost:9100
 ```
 
 Ou plus simplement, via le script fourni (crée un venv, installe et lance) :
@@ -141,7 +174,7 @@ npm run dev
 > ℹ️ Les endpoints exposés : `GET /api/analysis/technical/{ticker}`,
 > `GET /api/analysis/fundamentals/{ticker}`, `GET /api/analysis/news/{ticker}`,
 > `POST /api/analysis/backtest/{ticker}`. Documentation interactive auto-générée
-> sur http://localhost:8000/docs.
+> sur http://localhost:9100/docs.
 >
 > Les fondamentaux et news ne concernent que les **actions américaines** ; pour les
 > cryptos, seuls les onglets « Analyse Technique » et « Backtest » sont disponibles.

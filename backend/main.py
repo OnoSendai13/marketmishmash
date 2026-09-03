@@ -8,7 +8,7 @@ API FastAPI fournissant l'analyse des valeurs (actions et crypto) au frontend :
   - News + sentiment (finvizfinance + VADER)
   - Backtest de stratégies simples (backtesting.py)
 
-Lancement :  uvicorn main:app --reload --port 8000
+Lancement :  uvicorn main:app --reload --port 9100
 """
 
 from __future__ import annotations
