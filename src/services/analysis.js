@@ -1,5 +1,5 @@
 // Service d'accès au micro-backend d'analyse (FastAPI).
-// En développement, Vite proxifie « /api » vers http://localhost:8000
+// En développement, Vite proxifie « /api » vers http://localhost:9100
 // (voir vite.config.js). Le backend doit donc être lancé en parallèle.
 
 const BASE = '/api/analysis'

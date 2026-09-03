@@ -17,9 +17,9 @@ const yahooProxy = {
     },
   },
   // Proxy vers le micro-backend d'analyse Python (FastAPI, Phase 1).
-  // Lancez-le en parallèle : cd backend && ./start.sh  (port 8000).
+  // Lancez-le en parallèle : cd backend && ./start.sh  (port 9100).
   '/api': {
-    target: 'http://localhost:8000',
+    target: 'http://localhost:9100',
     changeOrigin: true,
   },
 }
@@ -28,12 +28,14 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: true,
+    port: 9000,
     allowedHosts: true,
     proxy: yahooProxy,
   },
   // Le proxy est aussi appliqué en `npm run preview`.
   preview: {
     host: true,
+    port: 9000,
     allowedHosts: true,
     proxy: yahooProxy,
   },

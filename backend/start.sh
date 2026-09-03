@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Script de démarrage du micro-backend d'analyse MarketMishmash.
 # Active un venv si présent (sinon en crée un), installe les dépendances,
-# puis lance uvicorn sur le port 8000.
+# puis lance uvicorn sur le port 9100.
 set -e
 
 cd "$(dirname "$0")"
@@ -18,5 +18,5 @@ echo "Installation des dépendances..."
 pip install --upgrade pip >/dev/null
 pip install -r requirements.txt
 
-echo "Démarrage de l'API sur http://localhost:8000 ..."
-exec uvicorn main:app --reload --host 0.0.0.0 --port 8000
+echo "Démarrage de l'API sur http://localhost:9100 ..."
+exec uvicorn main:app --reload --host 0.0.0.0 --port 9100
