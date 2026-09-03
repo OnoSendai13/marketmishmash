@@ -3,6 +3,7 @@ import { useParams, useSearchParams, Link } from 'react-router-dom'
 import TechnicalTab from './tabs/TechnicalTab'
 import FundamentalsTab from './tabs/FundamentalsTab'
 import BacktestTab from './tabs/BacktestTab'
+import NewsTab from './tabs/NewsTab'
 import { fetchStockQuote } from '../services/finnhub'
 import { fetchCryptoMarkets } from '../services/coingecko'
 import { formatPrice, formatPercent } from '../utils/format'
@@ -10,6 +11,7 @@ import { formatPrice, formatPercent } from '../utils/format'
 const TABS = [
   { key: 'technical', label: 'Analyse Technique' },
   { key: 'fundamentals', label: 'Fondamentaux & News' },
+  { key: 'news', label: '📰 News' },
   { key: 'backtest', label: 'Backtest' },
 ]
 
@@ -60,6 +62,8 @@ export default function DetailPage() {
     switch (activeTab) {
       case 'fundamentals':
         return <FundamentalsTab ticker={ticker} isCrypto={isCrypto} symbol={symbol} />
+      case 'news':
+        return <NewsTab ticker={ticker} />
       case 'backtest':
         return <BacktestTab ticker={ticker} />
       case 'technical':

@@ -30,3 +30,6 @@ pnpm-debug.log*
 backend/venv/
 __pycache__/
 *.pyc
+
+# Clés API du backend (Phase 2) — ne jamais committer la vraie clé
+backend/.env

@@ -1,21 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
-import {
-  ResponsiveContainer,
-  ComposedChart,
-  LineChart,
-  BarChart,
-  Line,
-  Area,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ReferenceLine,
-  Legend,
-} from 'recharts'
-import { fetchTechnical } from '../../services/analysis'
+import { useEffect, useState } from 'react'
+import { fetchTechnical, fetchFVG } from '../../services/analysis'
 import { formatPrice } from '../../utils/format'
+import CandlestickChart from '../../components/CandlestickChart'
 
 const PERIODS = [
   { key: '3mo', label: '3 mois' },
@@ -47,6 +33,7 @@ function StatCell({ label, value, tone }) {
 export default function TechnicalTab({ ticker }) {
   const [period, setPeriod] = useState('6mo')
   const [payload, setPayload] = useState(null)
+  const [fvgs, setFvgs] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -54,9 +41,15 @@ export default function TechnicalTab({ ticker }) {
     let cancelled = false
     setLoading(true)
     setError(null)
-    fetchTechnical(ticker, period, '1d')
-      .then((d) => {
-        if (!cancelled) setPayload(d)
+    // Analyse technique + FVG chargées en parallèle.
+    Promise.all([
+      fetchTechnical(ticker, period, '1d'),
+      fetchFVG(ticker, period, '1d').catch(() => ({ fvgs: [] })),
+    ])
+      .then(([tech, fvg]) => {
+        if (cancelled) return
+        setPayload(tech)
+        setFvgs(fvg?.fvgs || [])
       })
       .catch((e) => {
         if (!cancelled) setError(e.message || 'Erreur de chargement')
@@ -69,24 +62,8 @@ export default function TechnicalTab({ ticker }) {
     }
   }, [ticker, period])
 
-  const chartData = useMemo(() => {
-    if (!payload?.data) return []
-    return payload.data.map((r) => ({
-      date: r.date.slice(0, 10),
-      close: r.close,
-      ema20: r.ema_20,
-      ema50: r.ema_50,
-      ema200: r.ema_200,
-      bbUpper: r.bb_upper,
-      bbLower: r.bb_lower,
-      rsi: r.rsi_14,
-      macd: r.macd,
-      signal: r.macd_signal,
-      hist: r.macd_hist,
-    }))
-  }, [payload])
-
   const summary = payload?.summary
+  const fvgOpen = fvgs.filter((f) => !f.filled).length
 
   return (
     <div>
@@ -140,81 +117,19 @@ export default function TechnicalTab({ ticker }) {
               <StatCell label="EMA 50" value={fmt(summary.ema_50)} />
               <StatCell label="EMA 200" value={fmt(summary.ema_200)} />
               <StatCell
-                label="Bandes Bollinger"
-                value={`${fmt(summary.bb_lower, 0)} – ${fmt(summary.bb_upper, 0)}`}
+                label="FVG non remplis"
+                value={String(fvgOpen)}
+                tone={fvgOpen > 0 ? 'up' : undefined}
               />
             </div>
           )}
 
-          {/* Graphique de cours + EMA + Bollinger */}
-          <div className="mb-6 rounded-xl border border-white/5 bg-panel p-4">
-            <h3 className="mb-2 text-sm font-semibold text-gray-300">
-              Cours &amp; moyennes mobiles (EMA 20/50/200) + Bandes de Bollinger
+          {/* Graphique pro (chandeliers TradingView) + EMA + Bollinger + FVG + RSI + MACD */}
+          <div className="rounded-xl border border-white/5 bg-panel p-4">
+            <h3 className="mb-3 text-sm font-semibold text-gray-300">
+              Chandeliers &amp; indicateurs — EMA 20/50/200, Bandes de Bollinger, zones FVG
             </h3>
-            <ResponsiveContainer width="100%" height={320}>
-              <ComposedChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" />
-                <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#9ca3af' }} minTickGap={40} />
-                <YAxis
-                  domain={['auto', 'auto']}
-                  tick={{ fontSize: 10, fill: '#9ca3af' }}
-                  width={55}
-                  tickFormatter={(v) => fmt(v, 0)}
-                />
-                <Tooltip
-                  contentStyle={{ background: '#111827', border: '1px solid #ffffff20', fontSize: 12 }}
-                  formatter={(v, name) => [fmt(v), name]}
-                />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Area type="monotone" dataKey="bbUpper" stroke="#6366f130" fill="#6366f110" name="BB sup." dot={false} />
-                <Area type="monotone" dataKey="bbLower" stroke="#6366f130" fill="#0000" name="BB inf." dot={false} />
-                <Line type="monotone" dataKey="close" stroke="#e5e7eb" strokeWidth={2} dot={false} name="Cours" />
-                <Line type="monotone" dataKey="ema20" stroke="#22d3ee" strokeWidth={1} dot={false} name="EMA 20" />
-                <Line type="monotone" dataKey="ema50" stroke="#f59e0b" strokeWidth={1} dot={false} name="EMA 50" />
-                <Line type="monotone" dataKey="ema200" stroke="#ef4444" strokeWidth={1} dot={false} name="EMA 200" />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            {/* RSI */}
-            <div className="rounded-xl border border-white/5 bg-panel p-4">
-              <h3 className="mb-2 text-sm font-semibold text-gray-300">RSI (14) — zones 30 / 70</h3>
-              <ResponsiveContainer width="100%" height={200}>
-                <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" />
-                  <XAxis dataKey="date" tick={{ fontSize: 9, fill: '#9ca3af' }} minTickGap={50} />
-                  <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#9ca3af' }} width={30} />
-                  <Tooltip
-                    contentStyle={{ background: '#111827', border: '1px solid #ffffff20', fontSize: 12 }}
-                    formatter={(v) => [fmt(v), 'RSI']}
-                  />
-                  <ReferenceLine y={70} stroke="#ef4444" strokeDasharray="4 4" />
-                  <ReferenceLine y={30} stroke="#22c55e" strokeDasharray="4 4" />
-                  <Line type="monotone" dataKey="rsi" stroke="#a78bfa" strokeWidth={1.5} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* MACD */}
-            <div className="rounded-xl border border-white/5 bg-panel p-4">
-              <h3 className="mb-2 text-sm font-semibold text-gray-300">MACD (12, 26, 9)</h3>
-              <ResponsiveContainer width="100%" height={200}>
-                <ComposedChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" />
-                  <XAxis dataKey="date" tick={{ fontSize: 9, fill: '#9ca3af' }} minTickGap={50} />
-                  <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} width={40} tickFormatter={(v) => fmt(v, 1)} />
-                  <Tooltip
-                    contentStyle={{ background: '#111827', border: '1px solid #ffffff20', fontSize: 12 }}
-                    formatter={(v, name) => [fmt(v), name]}
-                  />
-                  <ReferenceLine y={0} stroke="#ffffff30" />
-                  <Bar dataKey="hist" name="Histogramme" fill="#64748b" />
-                  <Line type="monotone" dataKey="macd" stroke="#22d3ee" strokeWidth={1.5} dot={false} name="MACD" />
-                  <Line type="monotone" dataKey="signal" stroke="#f59e0b" strokeWidth={1.5} dot={false} name="Signal" />
-                </ComposedChart>
-              </ResponsiveContainer>
-            </div>
+            <CandlestickChart rows={payload.data} fvgs={fvgs} />
           </div>
         </>
       )}

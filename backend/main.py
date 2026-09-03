@@ -4,8 +4,9 @@ MarketMishmash — Micro-backend d'analyse (Phase 1)
 
 API FastAPI fournissant l'analyse des valeurs (actions et crypto) au frontend :
   - Analyse technique (pandas-ta-classic) : RSI, MACD, Bollinger, EMA, ATR...
+  - Fair Value Gaps / FVG (Smart Money Concepts)
   - Fondamentaux (finvizfinance) : ratios financiers des actions US
-  - News + sentiment (finvizfinance + VADER)
+  - News + sentiment (finvizfinance + VADER, et Alpha Vantage NEWS_SENTIMENT)
   - Backtest de stratégies simples (backtesting.py)
 
 Lancement :  uvicorn main:app --reload --port 9100
@@ -14,11 +15,15 @@ Lancement :  uvicorn main:app --reload --port 9100
 from __future__ import annotations
 
 import math
+import os
+import time
 from typing import Any, Optional
 
 import numpy as np
 import pandas as pd
+import requests
 import yfinance as yf
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -28,6 +33,12 @@ import pandas_ta_classic as ta  # pandas-ta-classic s'importe sous "pandas_ta_cl
 
 # --- Sentiment --------------------------------------------------------------
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+
+# Charge les variables d'environnement depuis backend/.env (clé Alpha Vantage, etc.).
+# On cible explicitement le .env situé à côté de ce fichier, pour que la clé soit
+# chargée quel que soit le répertoire de lancement (start.sh, start.ps1, uvicorn direct).
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
+ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
 
 app = FastAPI(
     title="MarketMishmash Analysis API",
@@ -168,6 +179,81 @@ def technical_analysis(ticker: str, period: str = "6mo", interval: str = "1d") -
 
 
 # ---------------------------------------------------------------------------
+# 1bis) Fair Value Gaps (FVG) — Smart Money Concepts
+# ---------------------------------------------------------------------------
+@app.get("/api/analysis/fvg/{ticker}")
+def fair_value_gaps(ticker: str, period: str = "3mo", interval: str = "1d") -> dict:
+    """Détecte les Fair Value Gaps (FVG) selon la définition Smart Money Concepts.
+
+    Un FVG est une inefficience de prix formée sur 3 bougies consécutives :
+      - FVG haussier : le haut de la bougie N-2 est sous le bas de la bougie N
+        (high[i-2] < low[i]) → zone [high[i-2], low[i]].
+      - FVG baissier : le bas de la bougie N-2 est au-dessus du haut de la bougie N
+        (low[i-2] > high[i]) → zone [high[i], low[i-2]].
+
+    On ne garde que les gaps dont la taille dépasse 0,1 % du prix (filtrage du bruit),
+    et on marque un FVG comme « rempli » (filled) si une bougie ultérieure est repassée
+    à l'intérieur de la zone.
+    """
+    df = _download_ohlcv(ticker, period=period, interval=interval)
+    df = df.dropna(subset=["high", "low"])
+
+    highs = df["high"].to_numpy(dtype=float)
+    lows = df["low"].to_numpy(dtype=float)
+    closes = df["close"].to_numpy(dtype=float)
+    dates = [idx.strftime("%Y-%m-%d %H:%M:%S") for idx in df.index]
+
+    fvgs: list[dict] = []
+    n = len(df)
+    # Le FVG se forme sur le triplet (i-2, i-1, i) ; on l'indexe sur la bougie i.
+    for i in range(2, n):
+        price_ref = closes[i] if closes[i] > 0 else (highs[i] + lows[i]) / 2.0
+        if price_ref <= 0:
+            continue
+        min_size = price_ref * 0.001  # seuil : 0,1 % du prix
+
+        # FVG haussier : high[i-2] < low[i]
+        if highs[i - 2] < lows[i]:
+            bottom = float(highs[i - 2])
+            top = float(lows[i])
+            if (top - bottom) > min_size:
+                # Rempli si une bougie postérieure revient dans la zone.
+                filled = bool(np.any(lows[i + 1:] <= top)) if i + 1 < n else False
+                fvgs.append(
+                    {
+                        "type": "bullish",
+                        "top": round(top, 6),
+                        "bottom": round(bottom, 6),
+                        "date": dates[i],
+                        "filled": filled,
+                    }
+                )
+        # FVG baissier : low[i-2] > high[i]
+        elif lows[i - 2] > highs[i]:
+            top = float(lows[i - 2])
+            bottom = float(highs[i])
+            if (top - bottom) > min_size:
+                filled = bool(np.any(highs[i + 1:] >= bottom)) if i + 1 < n else False
+                fvgs.append(
+                    {
+                        "type": "bearish",
+                        "top": round(top, 6),
+                        "bottom": round(bottom, 6),
+                        "date": dates[i],
+                        "filled": filled,
+                    }
+                )
+
+    return {
+        "ticker": ticker.upper(),
+        "period": period,
+        "interval": interval,
+        "count": len(fvgs),
+        "fvgs": fvgs,
+    }
+
+
+# ---------------------------------------------------------------------------
 # 2) Fondamentaux (actions US uniquement)
 # ---------------------------------------------------------------------------
 @app.get("/api/analysis/fundamentals/{ticker}")
@@ -278,6 +364,119 @@ def _label_from_score(score: float) -> str:
     if score <= -0.05:
         return "baissier"
     return "neutre"
+
+
+# ---------------------------------------------------------------------------
+# 3bis) News + Sentiment via Alpha Vantage (NEWS_SENTIMENT)
+# ---------------------------------------------------------------------------
+# Cache mémoire simple : { ticker_upper: (timestamp_epoch, payload) }.
+_AV_NEWS_CACHE: dict[str, tuple[float, dict]] = {}
+_AV_CACHE_TTL = 15 * 60  # 15 minutes
+
+
+@app.get("/api/analysis/news_av/{ticker}")
+def news_alpha_vantage(ticker: str) -> dict:
+    """Retourne les dernières news + sentiment via l'API Alpha Vantage (NEWS_SENTIMENT).
+
+    Le résultat est mis en cache 15 minutes par ticker pour préserver le quota API.
+    """
+    key = ticker.upper()
+    now = time.time()
+
+    # Cache hit ?
+    cached = _AV_NEWS_CACHE.get(key)
+    if cached is not None and (now - cached[0]) < _AV_CACHE_TTL:
+        payload = dict(cached[1])
+        payload["cached"] = True
+        return payload
+
+    if not ALPHA_VANTAGE_API_KEY:
+        raise HTTPException(
+            status_code=503,
+            detail="Clé Alpha Vantage absente : définissez ALPHA_VANTAGE_API_KEY dans backend/.env.",
+        )
+
+    url = "https://www.alphavantage.co/query"
+    params = {
+        "function": "NEWS_SENTIMENT",
+        "tickers": key,
+        "apikey": ALPHA_VANTAGE_API_KEY,
+        "limit": 20,
+    }
+    try:
+        resp = requests.get(url, params=params, timeout=20)
+        resp.raise_for_status()
+        raw = resp.json()
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Échec de l'appel Alpha Vantage : {exc}")
+
+    # Alpha Vantage renvoie un message d'information/erreur au lieu du feed en cas de
+    # quota dépassé ou de ticker invalide.
+    if "feed" not in raw:
+        note = raw.get("Information") or raw.get("Note") or raw.get("Error Message")
+        raise HTTPException(
+            status_code=502,
+            detail=f"Alpha Vantage n'a pas renvoyé d'articles pour « {key} ». {note or raw}",
+        )
+
+    feed = raw.get("feed", []) or []
+    items = []
+    scores = []
+    for art in feed[:20]:
+        # Sentiment spécifique au ticker demandé.
+        ticker_score = None
+        ticker_label = None
+        for ts in art.get("ticker_sentiment", []) or []:
+            if str(ts.get("ticker", "")).upper() == key:
+                ticker_score = _clean_float(ts.get("ticker_sentiment_score"))
+                ticker_label = ts.get("ticker_sentiment_label")
+                break
+
+        overall_score = _clean_float(art.get("overall_sentiment_score"))
+        if overall_score is not None:
+            scores.append(overall_score)
+
+        items.append(
+            {
+                "title": art.get("title", ""),
+                "url": art.get("url", ""),
+                "time_published": art.get("time_published", ""),
+                "source": art.get("source", ""),
+                "summary": art.get("summary", ""),
+                "overall_sentiment_score": overall_score,
+                "overall_sentiment_label": art.get("overall_sentiment_label", "Neutral"),
+                "ticker_sentiment_score": ticker_score,
+                "ticker_sentiment_label": ticker_label,
+            }
+        )
+
+    avg = float(np.mean(scores)) if scores else 0.0
+    payload = {
+        "ticker": key,
+        "provider": "alphavantage",
+        "count": len(items),
+        "average_score": round(avg, 4),
+        "average_label": _av_label_from_score(avg),
+        "items": items,
+        "cached": False,
+    }
+
+    _AV_NEWS_CACHE[key] = (now, payload)
+    return payload
+
+
+def _av_label_from_score(score: float) -> str:
+    """Traduit un score Alpha Vantage en libellé anglais (Bullish/Bearish/Neutral).
+
+    Seuils officiels Alpha Vantage : x <= -0.35 Bearish, -0.35 < x <= -0.15 Somewhat-Bearish,
+    -0.15 < x < 0.15 Neutral, 0.15 <= x < 0.35 Somewhat-Bullish, x >= 0.35 Bullish.
+    On simplifie ici en trois classes pour l'affichage.
+    """
+    if score >= 0.15:
+        return "Bullish"
+    if score <= -0.15:
+        return "Bearish"
+    return "Neutral"
 
 
 # ---------------------------------------------------------------------------
